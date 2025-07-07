@@ -1,0 +1,34 @@
+{
+  "name": "taro-bypass-password-protection",
+  "version": "1.0.0",
+  "description": "WordPress plugin to bypass password protection under basic authentication",
+  "main": "taro-bypass-password-protection.php",
+  "scripts": {
+    "start": "wp-env start",
+    "update": "wp-env start --update",
+    "stop": "wp-env stop",
+    "env": "wp-env",
+    "destroy": "wp-env destroy",
+    "cli": "wp-env run cli wp",
+    "cli:test": "wp-env run cli-test wp",
+    "setup-auth": "./scripts/setup-auth.sh",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "wordpress",
+    "plugin",
+    "password-protection",
+    "basic-auth"
+  ],
+  "author": "Your Name",
+  "license": "GPL-2.0",
+  "devDependencies": {
+    "@wordpress/env": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "volta": {
+    "node": "20.19.3"
+  }
+}

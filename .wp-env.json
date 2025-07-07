@@ -1,0 +1,19 @@
+{
+  "core": null,
+  "phpVersion": "8.1",
+  "plugins": [
+    "."
+  ],
+  "themes": [],
+  "config": {
+    "WP_DEBUG": true,
+    "WP_DEBUG_LOG": true,
+    "WP_DEBUG_DISPLAY": false
+  },
+  "mappings": {
+    ".htpasswd": ".htpasswd"
+  },
+  "lifecycleScripts": {
+    "start": "./scripts/setup-auth.sh"
+  }
+}
