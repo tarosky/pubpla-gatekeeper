@@ -2,7 +2,7 @@
 /**
  * プラグインのメインクラス
  *
- * @package Taro_Bypass_Password_Protection
+ * @package PubPla_Gatekeeper
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -10,26 +10,26 @@ defined( 'ABSPATH' ) || exit;
 /**
  * プラグインのメインクラス
  */
-class Taro_Bypass_Password_Protection {
+class PubPla_Gatekeeper {
 
 	/**
 	 * シングルトンインスタンス
 	 *
-	 * @var Taro_Bypass_Password_Protection
+	 * @var PubPla_Gatekeeper
 	 */
 	private static $instance = null;
 
 	/**
 	 * REST APIクラスのインスタンス
 	 *
-	 * @var Taro_Rest_Post_Password_Override
+	 * @var PubPla_Gatekeeper_Rest_Post_Password
 	 */
 	private $rest_api;
 
 	/**
 	 * シングルトンパターンでインスタンスを取得
 	 *
-	 * @return Taro_Bypass_Password_Protection
+	 * @return PubPla_Gatekeeper
 	 */
 	public static function get_instance() {
 		if ( null === self::$instance ) {
@@ -53,7 +53,7 @@ class Taro_Bypass_Password_Protection {
 		$this->load_dependencies();
 
 		// REST APIの初期化
-		$this->rest_api = new Taro_Rest_Post_Password_Override();
+		$this->rest_api = new PubPla_Gatekeeper_Rest_Post_Password();
 
 		// フック登録
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
@@ -64,7 +64,7 @@ class Taro_Bypass_Password_Protection {
 	 * 依存ファイルの読み込み
 	 */
 	private function load_dependencies() {
-		require_once TARO_BYPASS_PASSWORD_PROTECTION_PATH . 'includes/class-rest-post-password-override.php';
+		require_once PUBPLA_GATEKEEPER_PATH . 'includes/class-rest-post-password-override.php';
 	}
 
 	/**
@@ -72,10 +72,10 @@ class Taro_Bypass_Password_Protection {
 	 */
 	public function enqueue_scripts() {
 		wp_register_script(
-			'taro-post-password',
-			TARO_BYPASS_PASSWORD_PROTECTION_URL . 'assets/js/post-password.js',
+			'pubpla-gatekeeper-post-password',
+			PUBPLA_GATEKEEPER_URL . 'assets/js/post-password.js',
 			array( 'jquery', 'wp-api-fetch' ),
-			TARO_BYPASS_PASSWORD_PROTECTION_VERSION,
+			PUBPLA_GATEKEEPER_VERSION,
 			true
 		);
 	}
@@ -89,8 +89,8 @@ class Taro_Bypass_Password_Protection {
 	 * @return string
 	 */
 	public function override_password_form( $output, $post ) {
-		$rest_endpoint = rest_url( 'taro-bypass-password-protection/v1/post-password/' . $post->ID );
-		wp_enqueue_script( 'taro-post-password' );
+		$rest_endpoint = rest_url( 'pubpla-gatekeeper/v1/post-password/' . $post->ID );
+		wp_enqueue_script( 'pubpla-gatekeeper-post-password' );
 		return preg_replace( '/action="[^"]+"/u', sprintf( 'action="%s"', esc_url( $rest_endpoint ) ), $output );
 	}
 }

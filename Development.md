@@ -1,130 +1,129 @@
-# テスト手順
+# Development
 
-## 環境構築
+Developer notes for PubPla Gatekeeper. For test procedures, see [TESTING.md](TESTING.md).
 
-### wp-envを使用した環境構築
+## Environment Setup
 
-1. **依存関係のインストール**
-   ```bash
-   npm install
-   ```
-
-2. **wp-env環境の起動**
-   ```bash
-   npm run start
-   ```
-   
-   **注意**: `npm run start`を実行すると、wp-env環境の起動後に自動的にBasic認証設定が適用されます。
-
-3. **Basic認証の自動設定**
-   - wp-adminディレクトリに自動でBasic認証が設定されます
-   - 認証情報: `admin` / `admin`
-   - スクリプト: `scripts/setup-auth.sh`
-
-### 手動でBasic認証を設定する場合
+Requirements: Node.js 20, Docker.
 
 ```bash
-# Basic認証設定のみ実行
+# Install dependencies
+npm install
+
+# Start wp-env (Basic authentication is configured automatically)
+npm run start
+```
+
+Running `npm run start` applies the Basic authentication settings after wp-env starts.
+
+1. Access http://localhost:8888/wp-login.php
+2. Enter `admin` / `admin` in the Basic authentication dialog
+3. Log in to WordPress admin (initial setup required on first run)
+4. Go to Plugins > Installed Plugins and activate "PubPla Gatekeeper"
+
+### Basic Authentication Mechanism
+
+- **`.htpasswd`**: stored in the project root
+- **File mapping**: mapped to the container via `.wp-env.json`
+- **`.htaccess`**: the setup script appends its rules only when necessary
+- **Automation**: configured automatically by `npm run start`
+
+To run the Basic authentication setup only:
+
+```bash
 npm run setup-auth
 ```
 
-### 環境確認
+The protection scope in the development environment:
 
-- WordPressフロントエンド: http://localhost:8080
-- WordPress管理画面: http://localhost:8080/wp-admin/ (Basic認証あり)
-- プラグインディレクトリ: wp-content/plugins/taro-bypass-password-protection
+- Protected: `http://localhost:8888/wp-login.php`
+- Not protected: `http://localhost:8888/` (frontend)
+- Not protected: `http://localhost:8888/wp-admin/`
 
-## テスト手順
+The setup script manages `.htaccess` rules between markers:
 
-### 1. Basic認証の動作確認
-
-```bash
-# 認証なしでアクセス（401エラーが発生することを確認）
-curl -I http://localhost:8080/wp-admin/
-
-# Basic認証でアクセス（成功することを確認）
-curl -I -u admin:admin http://localhost:8080/wp-admin/
+```apache
+# //pubpla-gatekeeper START
+<Files "wp-login.php">
+    AuthType Basic
+    AuthName "WordPress Admin Area"
+    AuthUserFile /var/www/html/.htpasswd
+    Require valid-user
+</Files>
+# //pubpla-gatekeeper END
 ```
 
-### 2. プラグインの有効化
-
-1. http://localhost:8080/wp-admin/ にアクセス
-2. Basic認証ダイアログで `admin` / `admin` を入力
-3. WordPress管理画面にログイン（初回は setup が必要）
-4. プラグイン > インストール済みプラグイン で「Taro Bypass Password Protection」を有効化
-
-### 3. パスワード保護投稿の作成
-
-1. 投稿 > 新規追加
-2. 投稿を作成
-3. 公開設定で「パスワード保護」を選択
-4. パスワードを設定（例：`test123`）
-5. 投稿を公開
-
-### 4. プラグインの動作確認
-
-1. **Basic認証なしの環境での動作確認**
-   - 通常のWordPress環境では、パスワード保護投稿のフォームが正常に動作することを確認
-
-2. **Basic認証ありの環境での動作確認**
-   - Basic認証下では、通常のパスワード保護フォームが機能しない
-   - プラグインが有効化されていると、AJAXを通じてパスワード認証が行われる
-   - 投稿ページでパスワード入力フォームが正常に動作することを確認
-
-### 5. REST APIエンドポイントの確認
+### Cleanup
 
 ```bash
-# プラグインのREST APIエンドポイントが利用可能か確認
-curl -X POST http://localhost:8080/wp-json/taro-bypass-password-protection/v1/check-password \
-  -H "Content-Type: application/json" \
-  -d '{"post_id": 1, "password": "test123"}'
-```
-
-### 6. JavaScript動作確認
-
-1. ブラウザの開発者ツールを開く
-2. パスワード保護投稿ページでパスワードを入力
-3. コンソールログでAJAXリクエストが実行されることを確認
-4. 正しいパスワードを入力すると投稿内容が表示されることを確認
-
-## 環境のクリーンアップ
-
-```bash
-# wp-env環境の停止
+# Stop wp-env
 npm run stop
 
-# wp-env環境の削除（完全にクリーンアップ）
+# Destroy wp-env (complete cleanup)
 npm run destroy
 ```
 
-## トラブルシューティング
+## File Structure
 
-### docker-compose が見つからないエラー
+```
+pubpla-gatekeeper/
+├── pubpla-gatekeeper.php                       # Main plugin file
+├── includes/
+│   ├── class-pubpla-gatekeeper.php             # Main class
+│   └── class-rest-post-password-override.php   # REST API endpoint for post passwords
+├── assets/
+│   └── js/
+│       └── post-password.js                    # Frontend JavaScript
+├── scripts/
+│   └── setup-auth.sh                           # Basic authentication setup script
+├── .wp-env.json                                # wp-env configuration
+├── package.json                                # npm configuration
+└── .htpasswd                                   # Basic authentication credentials (development only)
+```
 
-wp-envが `docker-compose` コマンドを見つけられない場合：
+## REST API
+
+### Post password
+
+**POST** `/wp-json/pubpla-gatekeeper/v1/post-password/{post_id}`
+
+```json
+{
+  "post_password": "test123"
+}
+```
+
+Response:
+
+```json
+{
+  "url": "http://localhost:8888/post-permalink/"
+}
+```
+
+Like core's `wp-login.php?action=postpass`, the endpoint sets the `wp-postpass_{COOKIEHASH}` cookie and returns the permalink. The password itself is verified when the post is displayed.
+
+## Readme
+
+`README.md` is converted to `readme.txt` for WordPress.org by [fumikito/wp-readme](https://github.com/fumikito/wp-readme). Write it in the WordPress readme format:
+
+- `#` becomes `=== ===`, `##` becomes `== ==`, `###` becomes `= =`
+- Header fields end with two spaces for line breaks on GitHub
+- Wrap GitHub-only content in `<!-- only:github/ -->` ... `<!-- /only:github -->`
+
+## Troubleshooting
+
+### docker-compose not found
 
 ```bash
-# プロジェクトディレクトリにdocker-composeラッパーを作成
+# Run from the project directory
 chmod +x docker-compose
 PATH="$PWD:$PATH" npm run start
 ```
 
-### Basic認証が動作しない場合
+### Basic authentication not working
 
-1. .htaccessファイルが正しく配置されているか確認
-2. Apacheのmod_authが有効になっているか確認
-3. ファイルの権限が適切に設定されているか確認
-
-### プラグインが読み込まれない場合
-
-1. .wp-env.jsonの`mappings`設定が正しいか確認
-2. プラグインファイルがコンテナ内に正しくマップされているか確認
-3. wp-env環境を再起動してみる
-
-## 期待される動作
-
-- Basic認証下でWordPressの管理画面にアクセスできる
-- パスワード保護投稿がBasic認証環境でも正常に動作する
-- プラグインのREST APIエンドポイントが機能する
-- JavaScript（AJAX）を通じたパスワード認証が動作する
-- CSSやJavaScriptファイルが正しく読み込まれる
+```bash
+curl -I http://localhost:8888/wp-login.php                 # Should return 401
+curl -I -u admin:admin http://localhost:8888/wp-login.php  # Should return 200
+```

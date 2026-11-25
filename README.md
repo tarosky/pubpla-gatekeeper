@@ -1,205 +1,111 @@
-# Taro Bypass Password Protection
+# PubPla Gatekeeper
 
-A WordPress plugin that enables password-protected posts to function under Basic authentication.
+Contributors: tarosky, Takahashi_Fumiki  
+Tags: login security, inactive users, brute force, pwned passwords, basic auth  
+Requires at least: 6.6  
+Tested up to: 7.1  
+Requires PHP: 7.4  
+Stable Tag: nightly  
+License: GPLv2 or later  
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+Keep privileged accounts accountable: tiered login protection, dormant account isolation, and breached-password checks for WordPress.
 
 ## Description
 
-Normally, when WordPress admin area (wp-admin) is protected by Basic authentication, password-protected posts cannot function properly because Basic authentication is required when submitting the password form.
+PubPla Gatekeeper decides two things: who gets in, and who should still have the keys.
 
-This plugin uses REST API and AJAX to perform password authentication, allowing password-protected posts to work even under Basic authentication environments.
+Most login security plugins treat every account the same. PubPla Gatekeeper scales authentication strength and account lifecycle to what each user can actually do. An account that can install plugins deserves stricter treatment than an account that can only write its own posts.
 
-## Features
+<!-- only:github/ -->
+> **Status:** This plugin is under active development. Only the Basic authentication compatibility feature is available at this time. The other features below are on the roadmap. See [the epic issue](https://github.com/tarosky/pubpla-gatekeeper/issues/10) for progress.
+<!-- /only:github -->
 
-- **Basic Auth Environment Support**: Password-protected posts work normally even when wp-login.php is protected by Basic authentication
-- **REST API Endpoint**: `/wp-json/taro-bypass-password-protection/v1/post-password/{post_id}`
-- **AJAX Authentication**: Seamless password authentication on the frontend
-- **Cookie Management**: Session management for authenticated users
-- **Universal Compatibility**: Works without affecting existing WordPress themes
+### Capability tiers
 
-## Origin
+Users are classified by their effective capabilities (not role names), so custom roles and hardened setups such as `DISALLOW_FILE_MODS` are handled correctly.
 
-This plugin is a generic version of a solution developed for password-protected posts under Basic authentication environments.
+- **T4 Code execution**: can install, upload, or edit plugins and themes, or update core. Super admins on multisite.
+- **T3 Site settings**: can manage options or users.
+- **T2 Others' content**: can edit others' posts or post unfiltered HTML.
+- **T1 Own content**: can edit their own posts.
+- **T0 Read only**: not affected.
+
+Each feature uses these tiers to decide how strictly to act.
+
+### Features
+
+**Account-based login lock** (planned)
+
+- Counts failed logins per account, not per IP address, so distributed credential-stuffing attacks are covered.
+- While locked, every password attempt fails, even a correct one. Attackers learn nothing about whether a password was right.
+- The legitimate user receives a one-time unlock link by email. The lock stays in place for everyone else.
+- Responses are identical for existing and non-existing usernames, so usernames cannot be enumerated.
+
+**Dormant account isolation** (planned)
+
+- Privileged accounts with no recent activity are locked in advance and can sign in only through an emailed one-time link.
+- If they stay dormant, they are demoted to no role. The previous role is saved and can be restored with one click.
+- Sessions and application passwords are revoked on demotion.
+- The last administrator (or super admin) is never demoted.
+- Reports are available for periodic access reviews.
+
+**Breached-password checks** (planned)
+
+- Checks passwords against the [Have I Been Pwned](https://haveibeenpwned.com/Passwords) Pwned Passwords database using k-anonymity. Neither the password nor its full hash leaves your server.
+- Privileged users with a breached password must change it before entering the admin screen.
+- Breached passwords cannot be set on profile updates, password resets, or registration.
+- If the API is unreachable, the check is skipped and login is never blocked.
+
+**Two-factor enforcement** (planned)
+
+- Requires two-factor authentication for users at or above a configurable tier, using the [Two Factor](https://wordpress.org/plugins/two-factor/) plugin.
+
+**Application password restrictions** (planned)
+
+- Allows or denies application passwords by tier. Unused application passwords are revoked automatically.
+
+**Basic authentication compatibility** (available)
+
+- Password-protected posts work even when `wp-login.php` is protected by Basic authentication. The password form is submitted to a REST API endpoint instead of `wp-login.php`, so you do not need to make any exception in your Basic authentication settings.
+
+### Designed for teams and enterprises
+
+- Protection is enforced in the authentication process itself (`authenticate`), not on a particular screen or URL, so custom login forms are covered too.
+- State changes fire action hooks so you can forward them to your own audit log.
+- Each feature can be turned on or off independently.
+- WP-CLI commands and multisite are supported.
+- Works alongside other security plugins and Basic authentication.
 
 ## Installation
 
-### 1. Environment Setup
+1. Upload the `pubpla-gatekeeper` folder to the `/wp-content/plugins/` directory, or install the plugin through the WordPress plugins screen.
+2. Activate the plugin through the "Plugins" screen in WordPress.
 
-```bash
-# Install dependencies
-npm install
+<!-- only:github/ -->
+For development setup and testing, see [Development.md](Development.md) and [TESTING.md](TESTING.md).
+<!-- /only:github -->
 
-# Start wp-env environment (Basic authentication configured automatically)
-npm run start
-```
+## Frequently Asked Questions
 
-**Note**: Running `npm run start` will automatically apply Basic authentication settings after starting the wp-env environment.
+### Does this plugin send passwords to external services?
 
-### 2. WordPress Setup
+No. The breached-password check sends only the first five characters of the SHA-1 hash of a password to the Have I Been Pwned API. The comparison is done on your server.
 
-1. Access http://localhost:8888/wp-login.php
-2. Enter `admin` / `admin` in the Basic authentication dialog
-3. Log in to WordPress admin (initial setup required on first run)
-4. Go to Plugins > Installed Plugins and activate "Taro Bypass Password Protection"
+### Will users be locked out if an external service is down?
 
-### Basic Authentication Mechanism
+No. External checks fail open: if the API cannot be reached, the check is skipped.
 
-- **`.htpasswd` File**: Stored locally in the project root
-- **File Mapping**: Mapped to container via `.wp-env.json`
-- **`.htaccess` Configuration**: Detects existing files and appends only when necessary
-- **Automation**: Configured automatically when starting environment with `npm run start`
+### Does this plugin implement two-factor authentication?
 
-### Manual Basic Authentication Setup
+No. Two-factor authentication itself is provided by the Two Factor plugin. PubPla Gatekeeper only enforces it for privileged users.
 
-```bash
-# Run Basic authentication setup only
-npm run setup-auth
-```
+### I protect `wp-login.php` with Basic authentication. Can visitors still view password-protected posts?
 
-## Usage
-
-### Creating Password-Protected Posts
-
-1. Go to Posts > Add New
-2. Create your post
-3. In Publish settings, select "Password protected"
-4. Set a password (e.g., `test123`)
-5. Publish the post
-
-### Verification
-
-1. Access the password-protected post page
-2. A password input form should appear
-3. Enter the correct password and the post content should be displayed
-
-## Technical Specifications
-
-### File Structure
-
-```
-taro-bypass-password-protection/
-├── taro-bypass-password-protection.php    # Main plugin file
-├── includes/
-│   └── class-rest-post-password-override.php  # REST API endpoint
-├── assets/
-│   └── js/
-│       └── post-password.js               # Frontend JavaScript
-├── scripts/
-│   └── setup-auth.sh                      # Basic authentication setup script
-├── .wp-env.json                           # wp-env configuration
-├── package.json                           # npm configuration
-└── .htpasswd                              # Basic authentication credentials
-```
-
-### REST API Endpoint
-
-**POST** `/wp-json/taro-bypass-password-protection/v1/post-password/{post_id}`
-
-```json
-{
-  "post_password": "test123"
-}
-```
-
-Response example:
-```json
-{
-  "success": true,
-  "redirect_url": "http://localhost:8888/post-permalink"
-}
-```
-
-### JavaScript API
-
-The plugin automatically detects password-protected post forms and converts them to AJAX submission.
-
-## Development & Testing
-
-For detailed testing procedures, see [TESTING.md](TESTING.md).
-
-### Environment Information
-
-- WordPress: Latest version (auto-configured by wp-env)
-- PHP: 8.1
-- Apache: 2.4
-- Basic Authentication: admin/admin
-- Port: 8888 (default wp-env port)
-- Protected Area: wp-login.php only
-
-### Environment Cleanup
-
-```bash
-# Stop wp-env environment
-npm run stop
-
-# Destroy wp-env environment (complete cleanup)
-npm run destroy
-```
-
-## Basic Authentication Scope
-
-This plugin specifically addresses the issue where **wp-login.php is protected by Basic authentication**. The protection scope is:
-
-- ✅ **Protected**: `http://localhost:8888/wp-login.php` (Login page only)
-- 🔓 **Not Protected**: `http://localhost:8888/` (Frontend)
-- 🔓 **Not Protected**: `http://localhost:8888/wp-admin/` (Admin area)
-
-The plugin uses managed `.htaccess` rules with separators:
-
-```apache
-# //taro-bypass-password-protection START
-<Files "wp-login.php">
-    AuthType Basic
-    AuthName "WordPress Admin Area"
-    AuthUserFile /var/www/html/.htpasswd
-    Require valid-user
-</Files>
-# //taro-bypass-password-protection END
-```
-
-## Troubleshooting
-
-### docker-compose Not Found
-
-```bash
-# Run from project directory
-chmod +x docker-compose
-PATH="$PWD:$PATH" npm run start
-```
-
-### Basic Authentication Not Working
-
-```bash
-# Check authentication
-curl -I http://localhost:8888/wp-login.php          # Should return 401
-curl -I -u admin:admin http://localhost:8888/wp-login.php  # Should return 200
-```
-
-### Testing the Plugin
-
-1. Create a password-protected post
-2. Access the post from frontend
-3. Verify that the password form works without Basic authentication prompts
-4. Check that the AJAX request succeeds
-
-## Requirements
-
-- Node.js
-- Docker
-- WordPress (via wp-env)
-
-## License
-
-GPL-2.0
-
-## Author
-
-Ported from: WordPress site development project
+Yes. Password-protected posts are handled through the REST API, so visitors never have to pass Basic authentication.
 
 ## Changelog
 
-### 1.0.0
-- Initial release
-- REST API endpoint for password verification
-- AJAX-based password form handling
-- Basic authentication bypass for wp-login.php
-- Automatic environment setup with wp-env
+### 0.1.0
+
+* Renamed from Taro Bypass Password Protection to PubPla Gatekeeper.
