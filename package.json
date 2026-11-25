@@ -1,8 +1,8 @@
 {
-  "name": "taro-bypass-password-protection",
-  "version": "1.0.0",
-  "description": "WordPress plugin to bypass password protection under basic authentication",
-  "main": "taro-bypass-password-protection.php",
+  "name": "pubpla-gatekeeper",
+  "version": "0.1.0",
+  "description": "Keep privileged accounts accountable: tiered login protection, dormant account isolation, and breached-password checks for WordPress.",
+  "main": "pubpla-gatekeeper.php",
   "scripts": {
     "start": "wp-env start",
     "update": "wp-env start --update",
@@ -17,11 +17,14 @@
   "keywords": [
     "wordpress",
     "plugin",
+    "login-security",
+    "inactive-users",
+    "pwned-passwords",
     "password-protection",
     "basic-auth"
   ],
-  "author": "Your Name",
-  "license": "GPL-2.0",
+  "author": "Tarosky INC.",
+  "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@wordpress/env": "^10.0.0"
   },

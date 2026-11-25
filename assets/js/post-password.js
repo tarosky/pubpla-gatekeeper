@@ -1,7 +1,7 @@
 /**
  * パスワード保護機能をサポートするJS
  *
- * @handle taro-post-password
+ * @handle pubpla-gatekeeper-post-password
  * @deps jquery, wp-api-fetch
  */
 

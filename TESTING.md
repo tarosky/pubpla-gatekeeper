@@ -32,7 +32,7 @@ npm run setup-auth
 
 - WordPress Frontend: http://localhost:8888
 - WordPress Login: http://localhost:8888/wp-login.php (Basic authentication required)
-- Plugin Directory: wp-content/plugins/taro-bypass-password-protection
+- Plugin Directory: wp-content/plugins/pubpla-gatekeeper
 
 ## Testing Procedures
 
@@ -54,7 +54,7 @@ curl -I http://localhost:8888/
 1. Access http://localhost:8888/wp-login.php
 2. Enter `admin` / `admin` in Basic authentication dialog
 3. Log in to WordPress admin (initial setup required on first run)
-4. Go to Plugins > Installed Plugins and activate "Taro Bypass Password Protection"
+4. Go to Plugins > Installed Plugins and activate "PubPla Gatekeeper"
 
 ### 3. Creating Password-Protected Posts
 
@@ -78,7 +78,7 @@ curl -I http://localhost:8888/
 
 ```bash
 # Check if the plugin's REST API endpoint is available
-curl -X POST http://localhost:8888/wp-json/taro-bypass-password-protection/v1/post-password/1 \
+curl -X POST http://localhost:8888/wp-json/pubpla-gatekeeper/v1/post-password/1 \
   -H "Content-Type: application/json" \
   -d '{"post_password": "test123"}'
 ```
@@ -151,7 +151,7 @@ PATH="$PWD:$PATH" npm run start
 - **Expected**: Post content displayed without Basic auth prompt
 
 ### Test Case 4: REST API
-- **Input**: POST to `/wp-json/taro-bypass-password-protection/v1/post-password/{id}`
+- **Input**: POST to `/wp-json/pubpla-gatekeeper/v1/post-password/{id}`
 - **Expected**: JSON response with success status
 - **Input**: Wrong password
 - **Expected**: JSON response with error status

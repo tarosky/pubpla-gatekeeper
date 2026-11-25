@@ -35,8 +35,8 @@ fi
 echo "📦 コンテナ名: $WP_CONTAINER"
 
 # セパレータの定義
-START_MARKER="# //taro-bypass-password-protection START"
-END_MARKER="# //taro-bypass-password-protection END"
+START_MARKER="# //pubpla-gatekeeper START"
+END_MARKER="# //pubpla-gatekeeper END"
 
 # wp-login.php保護ルールの定義
 PROTECTION_RULES="$START_MARKER
@@ -61,7 +61,7 @@ if [ "$HTACCESS_EXISTS" = "true" ]; then
     MARKER_EXISTS=$(docker exec "$WP_CONTAINER" bash -c "grep -q '$START_MARKER' /var/www/html/.htaccess && echo 'true' || echo 'false'")
     
     if [ "$MARKER_EXISTS" = "true" ]; then
-        echo "🔄 既存のtaro-bypass-password-protection設定を更新中..."
+        echo "🔄 既存のpubpla-gatekeeper設定を更新中..."
         
         # 既存のセパレータ間の内容を削除して、新しいルールを挿入
         docker exec "$WP_CONTAINER" bash -c "

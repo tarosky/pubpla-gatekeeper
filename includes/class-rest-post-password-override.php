@@ -10,12 +10,12 @@
  * このAPIは、特定の条件下でパスワードをオーバーライドするために使用されます。
  * 例えば、特定のユーザーが特定のコンテンツにアクセスする際に、通常のパスワードチェックをスキップすることができます。
  */
-class Taro_Rest_Post_Password_Override {
+class PubPla_Gatekeeper_Rest_Post_Password {
 
 	/**
 	 * REST APIエンドポイントのネームスペース
 	 */
-	const NAMESPACE = 'taro-bypass-password-protection/v1';
+	const NAMESPACE = 'pubpla-gatekeeper/v1';
 
 	/**
 	 * コンストラクタ
@@ -84,7 +84,7 @@ class Taro_Rest_Post_Password_Override {
 		if ( ! $post ) {
 			return new WP_Error(
 				'rest_post_not_found',
-				__( '該当するページは見つかりませんでした。', 'taro-bypass-password-protection' ),
+				__( '該当するページは見つかりませんでした。', 'pubpla-gatekeeper' ),
 				array( 'status' => 404 )
 			);
 		}
@@ -95,7 +95,7 @@ class Taro_Rest_Post_Password_Override {
 			// パスワードが空
 			return new WP_Error(
 				'rest_post_no_password',
-				__( 'パスワードが設定されていません。', 'taro-bypass-password-protection' ),
+				__( 'パスワードが設定されていません。', 'pubpla-gatekeeper' ),
 				array( 'status' => 400 )
 			);
 		}
