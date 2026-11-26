@@ -1,0 +1,67 @@
+name: Release Package
+
+# WordPress.org 公開前のため、現時点では GitHub Release に ZIP を添付するのみ。
+# WordPress.org で slug が承認されたら、下のコメントアウトしたステップを有効にし、
+# 「Build ZIP」ステップを削除する（10up のアクションが generate-zip で ZIP を作る）。
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and attach plugin ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 7.4
+          tools: composer
+
+      - name: Setup Node.JS
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Install dependencies and build Assets
+        run: |
+          composer install --no-dev --prefer-dist
+          npm ci --ignore-scripts
+          npm run package
+
+      - name: Generate readme.txt
+        uses: tarosky/workflows/actions/wp-readme@main
+
+      - name: Versioning
+        uses: tarosky/workflows/actions/versioning@main
+        with:
+          version: ${{ github.event.release.tag_name }}
+          files: readme.txt,pubpla-gatekeeper.php
+
+      - name: Build ZIP
+        env:
+          SLUG: ${{ github.event.repository.name }}
+        run: |
+          mkdir -p "/tmp/${SLUG}"
+          rsync -a --exclude-from=.distignore ./ "/tmp/${SLUG}/"
+          (cd /tmp && zip -rq "${GITHUB_WORKSPACE}/${SLUG}.zip" "${SLUG}")
+
+      # - name: Deploy to WordPress Directory
+      #   uses: 10up/action-wordpress-plugin-deploy@stable
+      #   with:
+      #     generate-zip: true
+      #   env:
+      #     SVN_USERNAME: ${{ secrets.WP_ORG_USERNAME_TAROSKY }}
+      #     SVN_PASSWORD: ${{ secrets.WP_ORG_PASSWORD_TAROSKY }}
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ github.workspace }}/${{ github.event.repository.name }}.zip

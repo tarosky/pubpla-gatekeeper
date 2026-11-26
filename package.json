@@ -1,37 +1,65 @@
 {
-  "name": "pubpla-gatekeeper",
-  "version": "0.1.0",
-  "description": "Keep privileged accounts accountable: tiered login protection, dormant account isolation, and breached-password checks for WordPress.",
-  "main": "pubpla-gatekeeper.php",
-  "scripts": {
-    "start": "wp-env start",
-    "update": "wp-env start --update",
-    "stop": "wp-env stop",
-    "env": "wp-env",
-    "destroy": "wp-env destroy",
-    "cli": "wp-env run cli wp",
-    "cli:test": "wp-env run cli-test wp",
-    "setup-auth": "./scripts/setup-auth.sh",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-    "wordpress",
-    "plugin",
-    "login-security",
-    "inactive-users",
-    "pwned-passwords",
-    "password-protection",
-    "basic-auth"
-  ],
-  "author": "Tarosky INC.",
-  "license": "GPL-2.0-or-later",
-  "devDependencies": {
-    "@wordpress/env": "^10.0.0"
-  },
-  "engines": {
-    "node": ">=20.0.0"
-  },
-  "volta": {
-    "node": "20.19.3"
-  }
+	"name": "pubpla-gatekeeper",
+	"private": true,
+	"description": "Keep privileged accounts accountable: tiered login protection, dormant account isolation, and breached-password checks for WordPress.",
+	"scripts": {
+		"prepare": "husky",
+		"start": "wp-env start",
+		"update": "wp-env start --update",
+		"stop": "wp-env stop",
+		"env": "wp-env",
+		"destroy": "wp-env destroy",
+		"cli": "wp-env run cli wp",
+		"cli:test": "wp-env run tests-cli wp",
+		"setup-auth": "./scripts/setup-auth.sh",
+		"test": "RESULT=${PWD##*/} && wp-env run tests-cli ./wp-content/plugins/$RESULT/vendor/bin/phpunit -c ./wp-content/plugins/$RESULT/phpunit.xml.dist",
+		"package": "npm run build:js && npm run dump",
+		"build:js": "grab-deps js assets/js dist/js",
+		"dump": "grab-deps dump dist",
+		"watch": "npm-watch",
+		"fix": "npm run fix:js",
+		"fix:js": "eslint --fix -c .eslintrc assets/js",
+		"lint": "npm run lint:js",
+		"lint:js": "wp-scripts lint-js ./assets/js"
+	},
+	"keywords": [
+		"wordpress",
+		"plugin",
+		"login-security",
+		"inactive-users",
+		"pwned-passwords",
+		"password-protection",
+		"basic-auth"
+	],
+	"author": "Tarosky INC.",
+	"license": "GPL-2.0-or-later",
+	"engines": {
+		"node": ">=22.0"
+	},
+	"devDependencies": {
+		"@kunoichi/grab-deps": "^3.3.0",
+		"@wordpress/env": "^10.0.0",
+		"@wordpress/scripts": "^31.8.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.4.0",
+		"npm-watch": "^0.13.0"
+	},
+	"lint-staged": {
+		"*.js": "npm run lint:js",
+		"*.php": "composer lint"
+	},
+	"watch": {
+		"build:js": {
+			"extensions": "js",
+			"patterns": [
+				"assets/js"
+			]
+		},
+		"dump": {
+			"extensions": "js",
+			"patterns": [
+				"dist/js"
+			]
+		}
+	}
 }
