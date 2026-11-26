@@ -1,14 +1,10 @@
 <?php
 
 /**
- * パスワード保護機能改善
+ * 投稿パスワードの送信先
  *
- * wp-login.phpにBasic認証がかかっていると「パスワード保護」がうまく動かない。
- * なので、別のフィルターを使ってパスワードフォームを出力する。
- * また、パスワード保護エンドポイントの実装もコピーする。
- *
- * このAPIは、特定の条件下でパスワードをオーバーライドするために使用されます。
- * 例えば、特定のユーザーが特定のコンテンツにアクセスする際に、通常のパスワードチェックをスキップすることができます。
+ * wp-login.php を Basic 認証の内側に置くと、コアのパスワードフォーム（action=postpass）が使えない。
+ * そこでフォームの送信先をこの REST エンドポイントに差し替え、コアと同じ Cookie を発行する。
  */
 class PubPla_Gatekeeper_Rest_Post_Password {
 
@@ -71,66 +67,121 @@ class PubPla_Gatekeeper_Rest_Post_Password {
 	}
 
 	/**
-	 * 通常のREST APIエンドポイントと異なり、リダイレクト処理を行う
+	 * パスワードを受け取り、投稿パスワードの Cookie を発行する
 	 *
-	 * @see wp-login.php
+	 * JS（apiFetch）からのリクエストには JSON で、フォームの直接送信には 303 リダイレクトで応える。
+	 * これで JS が読み込まれない・止まった環境でも、ブラウザーに JSON が表示されることはない。
+	 *
+	 * @see wp-login.php の action=postpass
 	 * @param WP_REST_Request $request リクエストオブジェクト
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function handle_post( $request ) {
 		nocache_headers();
-		$redirect_to = home_url();
-		$post        = get_post( $request->get_param( 'post_id' ) );
-		if ( ! $post ) {
-			return new WP_Error(
-				'rest_post_not_found',
-				__( '該当するページは見つかりませんでした。', 'pubpla-gatekeeper' ),
-				array( 'status' => 404 )
-			);
+		$wants_json = $this->wants_json( $request );
+		$post       = get_post( $request->get_param( 'post_id' ) );
+		if ( ! $post || ! is_post_publicly_viewable( $post ) ) {
+			// 下書き・非公開などもまとめて「見つからない」とし、存在する投稿 ID を漏らさない。
+			return $wants_json
+				? new WP_Error( 'rest_post_not_found', __( '該当するページは見つかりませんでした。', 'pubpla-gatekeeper' ), array( 'status' => 404 ) )
+				: $this->redirect( home_url( '/' ) );
 		}
-		// 投稿自体は存在しているので、パーマリンクを取得。
 		$redirect_to = get_permalink( $post );
-		$password    = $request->get_param( 'post_password' );
-		if ( empty( $password ) ) {
-			// パスワードが空
-			return new WP_Error(
-				'rest_post_no_password',
-				__( 'パスワードが設定されていません。', 'pubpla-gatekeeper' ),
-				array( 'status' => 400 )
-			);
+		// REST のパラメーターは unslash 済みなので、ここで wp_unslash() してはいけない。
+		$password = (string) $request->get_param( 'post_password' );
+		if ( '' === $password ) {
+			return $wants_json
+				? new WP_Error( 'rest_post_no_password', __( 'パスワードが入力されていません。', 'pubpla-gatekeeper' ), array( 'status' => 400 ) )
+				: $this->redirect( $redirect_to );
 		}
 		if ( empty( $post->post_password ) ) {
-			// そもそもこの投稿にパスワードが指定されていない
-			return new WP_REST_Response( array(
-				'url' => $redirect_to,
-			) );
+			// そもそもこの投稿にパスワードが指定されていない。
+			return $this->success( $redirect_to, $wants_json );
 		}
-		// ここからパスワード認証処理開始。
+		if ( ! hash_equals( $post->post_password, $password ) ) {
+			// 遷移すればフォームが再表示されるので、ここでエラーを返しても漏れる情報は増えない。
+			return $wants_json
+				? new WP_Error( 'rest_post_wrong_password', __( 'パスワードが違います。', 'pubpla-gatekeeper' ), array( 'status' => 403 ) )
+				: $this->redirect( $redirect_to );
+		}
+		$this->set_cookie( $password );
+		return $this->success( $redirect_to, $wants_json );
+	}
+
+	/**
+	 * JS からのリクエストか（JSON の応答を期待しているか）
+	 *
+	 * apiFetch は Accept に application/json を付ける。ブラウザーのフォーム送信は付けない。
+	 *
+	 * @param WP_REST_Request $request リクエストオブジェクト
+	 * @return bool
+	 */
+	private function wants_json( $request ) {
+		return false !== strpos( (string) $request->get_header( 'accept' ), 'application/json' );
+	}
+
+	/**
+	 * 成功時のレスポンス
+	 *
+	 * @param string $url        遷移先
+	 * @param bool   $wants_json JSON で返すか
+	 * @return WP_REST_Response
+	 */
+	private function success( $url, $wants_json ) {
+		return $wants_json ? new WP_REST_Response( array( 'url' => $url ) ) : $this->redirect( $url );
+	}
+
+	/**
+	 * リダイレクトのレスポンス（POST の後なので 303 See Other）
+	 *
+	 * @param string $url 遷移先
+	 * @return WP_REST_Response
+	 */
+	private function redirect( $url ) {
+		$response = new WP_REST_Response( array( 'url' => $url ), 303 );
+		$response->header( 'Location', $url );
+		return $response;
+	}
+
+	/**
+	 * 投稿パスワードの Cookie の値を作る
+	 *
+	 * コアの wp-login.php（action=postpass）と同じ方式。post_password_required() が
+	 * この値を検証するので、コアが方式を変えたらテストで検知する。
+	 *
+	 * @param string $password 平文のパスワード
+	 * @return string
+	 */
+	public static function hash_password( $password ) {
 		require_once ABSPATH . WPINC . '/class-phpass.php';
 		$hasher = new PasswordHash( 8, true );
-		$expire = apply_filters( 'post_password_expires', time() + 10 * DAY_IN_SECONDS );
-		$secure = is_ssl();
+		return $hasher->HashPassword( $password );
+	}
 
-		// REST API経由でのクッキーパス問題を解決するため、サイトのホームURLからパスを取得
-		$home_path   = wp_parse_url( home_url(), PHP_URL_PATH );
-		$cookie_path = $home_path ? rtrim( $home_path, '/' ) . '/' : '/';
-
-		$args = array(
-			'expires' => $expire,
-			'path'    => $cookie_path,
-			'domain'  => COOKIE_DOMAIN,
-			'secure'  => $secure,
-		);
-		if ( $secure ) {
-			$args['samesite'] = 'None';
+	/**
+	 * 投稿パスワードの Cookie を発行する
+	 *
+	 * @param string $password 平文のパスワード
+	 * @return void
+	 */
+	private function set_cookie( $password ) {
+		if ( headers_sent() ) {
+			return;
 		}
+		/** This filter is documented in wp-login.php */
+		$expire = apply_filters( 'post_password_expires', time() + 10 * DAY_IN_SECONDS );
 		setcookie(
 			'wp-postpass_' . COOKIEHASH,
-			$hasher->HashPassword( wp_unslash( $password ) ),
-			$args
+			self::hash_password( $password ),
+			array(
+				'expires'  => $expire,
+				'path'     => COOKIEPATH,
+				'domain'   => COOKIE_DOMAIN,
+				'secure'   => is_ssl(),
+				'httponly' => true,
+				// 同じサイトの中でしか使わないので Lax で足りる。
+				'samesite' => 'Lax',
+			)
 		);
-		return new WP_REST_Response( array(
-			'url' => $redirect_to,
-		) );
 	}
 }

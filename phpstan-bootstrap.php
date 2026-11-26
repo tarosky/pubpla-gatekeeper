@@ -26,3 +26,7 @@ if ( ! defined( 'WPINC' ) ) {
 if ( ! defined( 'COOKIEHASH' ) ) {
 	define( 'COOKIEHASH', md5( 'https://example.com' ) );
 }
+
+if ( ! defined( 'COOKIEPATH' ) ) {
+	define( 'COOKIEPATH', '/' );
+}

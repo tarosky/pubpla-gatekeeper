@@ -68,11 +68,8 @@ class PubPla_Gatekeeper {
 	 * @return string
 	 */
 	public function override_password_form( $output, $post ) {
-		// JS が未ビルド（wp-dependencies.json がない）ならフォームはコアのまま残す。
-		// 送信先だけ REST に変えると、送信後にブラウザーへ JSON が表示されてしまうため。
-		if ( ! wp_script_is( 'pubpla-gatekeeper-post-password', 'registered' ) ) {
-			return $output;
-		}
+		// エンドポイントは JS なしのフォーム送信にもリダイレクトで応えるので、送信先は常に書き換える。
+		// JS はエラーをフォーム上に表示するための上乗せで、未ビルドなら登録されず何もしない。
 		$rest_endpoint = rest_url( 'pubpla-gatekeeper/v1/post-password/' . $post->ID );
 		wp_enqueue_script( 'pubpla-gatekeeper-post-password' );
 		return preg_replace( '/action="[^"]+"/u', sprintf( 'action="%s"', esc_url( $rest_endpoint ) ), $output );
