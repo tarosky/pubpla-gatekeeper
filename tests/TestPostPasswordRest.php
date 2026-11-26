@@ -87,11 +87,26 @@ class TestPostPasswordRest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Password form action points to the REST endpoint.
+	 * Password form action points to the REST endpoint when the script is available.
 	 */
 	public function test_password_form_action() {
+		if ( ! wp_script_is( 'pubpla-gatekeeper-post-password', 'registered' ) ) {
+			// Assets are not built in CI. Register a stub to simulate a built package.
+			wp_register_script( 'pubpla-gatekeeper-post-password', 'https://example.com/post-password.js', array(), '1.0', true );
+		}
 		$post_id = self::factory()->post->create( array( 'post_password' => 'secret' ) );
 		$form    = get_the_password_form( $post_id );
 		$this->assertStringContainsString( rest_url( 'pubpla-gatekeeper/v1/post-password/' . $post_id ), $form );
+	}
+
+	/**
+	 * Password form is left untouched when the script is not built.
+	 */
+	public function test_password_form_without_script() {
+		wp_deregister_script( 'pubpla-gatekeeper-post-password' );
+		$post_id = self::factory()->post->create( array( 'post_password' => 'secret' ) );
+		$form    = get_the_password_form( $post_id );
+		$this->assertStringNotContainsString( 'pubpla-gatekeeper/v1/post-password', $form );
+		$this->assertStringContainsString( 'wp-login.php?action=postpass', $form );
 	}
 }

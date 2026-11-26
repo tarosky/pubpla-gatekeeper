@@ -7,15 +7,16 @@ Developer notes for PubPla Gatekeeper. For test procedures, see [TESTING.md](TES
 Requirements: Node.js 22 (see `.node-version`), PHP 7.4+, Composer, Docker.
 
 ```bash
-# Install dependencies
+# Install dependencies and build assets
 composer install
 npm install
+npm run package
 
 # Start wp-env (Basic authentication is configured automatically)
 npm run start
 ```
 
-Running `npm run start` applies the Basic authentication settings after wp-env starts.
+Without `npm run package`, the plugin leaves the core password form as is. Running `npm run start` applies the Basic authentication settings after wp-env starts.
 
 1. Access http://localhost:8888/wp-login.php
 2. Enter `admin` / `admin` in the Basic authentication dialog
