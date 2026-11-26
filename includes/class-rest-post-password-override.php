@@ -110,12 +110,12 @@ class PubPla_Gatekeeper_Rest_Post_Password {
 		$hasher = new PasswordHash( 8, true );
 		$expire = apply_filters( 'post_password_expires', time() + 10 * DAY_IN_SECONDS );
 		$secure = is_ssl();
-		
+
 		// REST API経由でのクッキーパス問題を解決するため、サイトのホームURLからパスを取得
-		$home_path = wp_parse_url( home_url(), PHP_URL_PATH );
+		$home_path   = wp_parse_url( home_url(), PHP_URL_PATH );
 		$cookie_path = $home_path ? rtrim( $home_path, '/' ) . '/' : '/';
-		
-		$args   = array(
+
+		$args = array(
 			'expires' => $expire,
 			'path'    => $cookie_path,
 			'domain'  => COOKIE_DOMAIN,

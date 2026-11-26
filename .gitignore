@@ -41,3 +41,8 @@ build/
 
 # WordPress
 /wordpress/
+
+# Build artifacts (grab-deps)
+wp-dependencies.json
+.phpunit.result.cache
+.claude/settings.local.json

@@ -1,0 +1,93 @@
+name: Claude Code PR Review
+
+on:
+  workflow_run:
+    workflows: ["Test Plugin"]
+    types: [completed]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  # CI 全パス後の自動レビュー（同一リポジトリのPRのみ）
+  setup:
+    if: |
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.number }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Get PR number
+        id: pr
+        # ブランチ名はスクリプトに直接展開せず環境変数で渡す（スクリプトインジェクション対策）。
+        # 同名ブランチのフォーク PR を拾わないよう、CI が走った head SHA で照合する。
+        run: |
+          PR_NUMBER=$(gh pr list --head "$HEAD_BRANCH" --json number,headRefOid --jq ".[] | select(.headRefOid == \"$HEAD_SHA\") | .number" | head -n 1)
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+  auto-review:
+    needs: setup
+    if: needs.setup.outputs.pr_number != ''
+    uses: tarosky/workflows/.github/workflows/claude-review.yml@main
+    with:
+      plugin_name: pubpla-gatekeeper
+      ci_checks: "PHPStan Level 5, PHPCS, PHPUnit, ESLint, asset build"
+      pr_number: ${{ fromJSON(needs.setup.outputs.pr_number) }}
+      head_sha: ${{ github.event.workflow_run.head_sha }}
+      custom_focus: |
+        - 認証・権限判定のバイパスや、権限の段階判定（T0〜T4）の誤りがないか
+        - ログイン・パスワード処理でのタイミング攻撃やユーザー列挙の余地がないか
+        - nonce・権限チェック・サニタイズ・エスケープの漏れ
+    secrets: inherit
+
+  # "@claude auto-review" で手動レビュー（メンバーのみ、PRコメントのみ）
+  manual-setup:
+    if: |
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude auto-review') &&
+      github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.pr.outputs.number }}
+      head_sha: ${{ steps.pr.outputs.head_sha }}
+    steps:
+      - name: Get PR info
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=${{ github.event.issue.number }}
+          HEAD_SHA=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefOid --jq '.headRefOid')
+          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "head_sha=$HEAD_SHA" >> $GITHUB_OUTPUT
+
+  manual-review:
+    needs: manual-setup
+    if: needs.manual-setup.outputs.pr_number != ''
+    uses: tarosky/workflows/.github/workflows/claude-review.yml@main
+    with:
+      plugin_name: pubpla-gatekeeper
+      ci_checks: "PHPStan Level 5, PHPCS, PHPUnit, ESLint, asset build"
+      pr_number: ${{ fromJSON(needs.manual-setup.outputs.pr_number) }}
+      head_sha: ${{ needs.manual-setup.outputs.head_sha }}
+      is_manual: true
+      custom_focus: |
+        - 認証・権限判定のバイパスや、権限の段階判定（T0〜T4）の誤りがないか
+        - ログイン・パスワード処理でのタイミング攻撃やユーザー列挙の余地がないか
+        - nonce・権限チェック・サニタイズ・エスケープの漏れ
+    secrets: inherit

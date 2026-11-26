@@ -20,13 +20,6 @@ class PubPla_Gatekeeper {
 	private static $instance = null;
 
 	/**
-	 * REST APIクラスのインスタンス
-	 *
-	 * @var PubPla_Gatekeeper_Rest_Post_Password
-	 */
-	private $rest_api;
-
-	/**
 	 * シングルトンパターンでインスタンスを取得
 	 *
 	 * @return PubPla_Gatekeeper
@@ -53,10 +46,9 @@ class PubPla_Gatekeeper {
 		$this->load_dependencies();
 
 		// REST APIの初期化
-		$this->rest_api = new PubPla_Gatekeeper_Rest_Post_Password();
+		new PubPla_Gatekeeper_Rest_Post_Password();
 
-		// フック登録
-		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+		// フック登録（スクリプトは wp-dependencies.json から init で登録済み）
 		add_filter( 'the_password_form', array( $this, 'override_password_form' ), 10, 2 );
 	}
 
@@ -68,19 +60,6 @@ class PubPla_Gatekeeper {
 	}
 
 	/**
-	 * スクリプトの読み込み
-	 */
-	public function enqueue_scripts() {
-		wp_register_script(
-			'pubpla-gatekeeper-post-password',
-			PUBPLA_GATEKEEPER_URL . 'assets/js/post-password.js',
-			array( 'jquery', 'wp-api-fetch' ),
-			PUBPLA_GATEKEEPER_VERSION,
-			true
-		);
-	}
-
-	/**
 	 * パスワードフォームを変更する
 	 *
 	 * @param string   $output パスワードフォームのHTML出力
@@ -89,6 +68,11 @@ class PubPla_Gatekeeper {
 	 * @return string
 	 */
 	public function override_password_form( $output, $post ) {
+		// JS が未ビルド（wp-dependencies.json がない）ならフォームはコアのまま残す。
+		// 送信先だけ REST に変えると、送信後にブラウザーへ JSON が表示されてしまうため。
+		if ( ! wp_script_is( 'pubpla-gatekeeper-post-password', 'registered' ) ) {
+			return $output;
+		}
 		$rest_endpoint = rest_url( 'pubpla-gatekeeper/v1/post-password/' . $post->ID );
 		wp_enqueue_script( 'pubpla-gatekeeper-post-password' );
 		return preg_replace( '/action="[^"]+"/u', sprintf( 'action="%s"', esc_url( $rest_endpoint ) ), $output );
