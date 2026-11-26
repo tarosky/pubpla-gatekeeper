@@ -16,7 +16,7 @@ npm run package
 npm run start
 ```
 
-Without `npm run package`, the plugin leaves the core password form as is. Running `npm run start` applies the Basic authentication settings after wp-env starts.
+Without `npm run package`, the password form still works without JS, but errors are not shown on the form. Running `npm run start` applies the Basic authentication settings after wp-env starts.
 
 1. Access http://localhost:8888/wp-login.php
 2. Enter `admin` / `admin` in the Basic authentication dialog
@@ -129,7 +129,20 @@ Response:
 }
 ```
 
-Like core's `wp-login.php?action=postpass`, the endpoint sets the `wp-postpass_{COOKIEHASH}` cookie and returns the permalink. The password itself is verified when the post is displayed.
+The password form posts here instead of `wp-login.php?action=postpass`, so it keeps working when `wp-login.php` is behind Basic authentication. On success the endpoint sets the same `wp-postpass_{COOKIEHASH}` cookie as core (`HttpOnly`, `SameSite=Lax`).
+
+The response depends on the `Accept` header:
+
+| Case | JSON (`Accept: application/json`, sent by the JS) | Form submission without JS |
+|---|---|---|
+| Correct password | 200 `{ "url": permalink }` | 303 to the permalink |
+| Wrong password | 403 `rest_post_wrong_password` (no cookie) | 303 to the permalink (the form is shown again) |
+| Empty password | 400 `rest_post_no_password` | 303 to the permalink |
+| Missing or not publicly viewable post | 404 `rest_post_not_found` | 303 to the home page |
+
+Drafts and private posts are treated as missing so that the endpoint does not reveal which post IDs exist.
+
+`tests/TestPostPasswordRest.php` checks that the cookie value is accepted by core's `post_password_required()`, so a change in core's hashing fails CI.
 
 ## Readme
 
